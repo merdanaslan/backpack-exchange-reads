@@ -7,6 +7,10 @@ import {
   BackpackOrder, 
   BackpackFundingPayment, 
   BackpackSettlement,
+  BackpackFundingHistory,
+  BackpackBalance,
+  BackpackDeposit,
+  BackpackWithdrawal,
   HistoryResponse,
   PaginationParams 
 } from './types';
@@ -201,5 +205,121 @@ export class BackpackAPI {
     }
 
     return allSettlements;
+  }
+
+  async getFundingHistory(params?: PaginationParams): Promise<BackpackFundingHistory[]> {
+    const response = await this.makeRequest<BackpackFundingHistory[]>({
+      method: 'GET',
+      path: '/wapi/v1/history/funding',
+      params,
+    });
+    return response;
+  }
+
+  async getAllFundingHistory(): Promise<BackpackFundingHistory[]> {
+    const allFunding: BackpackFundingHistory[] = [];
+    let offset = 0;
+    const limit = 1000;
+
+    while (true) {
+      console.log(`Fetching funding history with offset ${offset}...`);
+      const funding = await this.getFundingHistory({ limit, offset });
+      
+      if (funding.length === 0) {
+        break;
+      }
+      
+      allFunding.push(...funding);
+      
+      if (funding.length < limit) {
+        break;
+      }
+      
+      offset += limit;
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allFunding;
+  }
+
+  async getBalances(): Promise<BackpackBalance> {
+    const response = await this.makeRequest<BackpackBalance>({
+      method: 'GET',
+      path: '/api/v1/capital',
+    });
+    return response;
+  }
+
+  async getDeposits(params?: PaginationParams): Promise<BackpackDeposit[]> {
+    const response = await this.makeRequest<BackpackDeposit[]>({
+      method: 'GET',
+      path: '/wapi/v1/capital/deposits',
+      params,
+    });
+    return response;
+  }
+
+  async getAllDeposits(): Promise<BackpackDeposit[]> {
+    const allDeposits: BackpackDeposit[] = [];
+    let offset = 0;
+    const limit = 1000;
+
+    while (true) {
+      console.log(`Fetching deposits with offset ${offset}...`);
+      const deposits = await this.getDeposits({ limit, offset });
+      
+      if (deposits.length === 0) {
+        break;
+      }
+      
+      allDeposits.push(...deposits);
+      
+      if (deposits.length < limit) {
+        break;
+      }
+      
+      offset += limit;
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allDeposits;
+  }
+
+  async getWithdrawals(params?: PaginationParams): Promise<BackpackWithdrawal[]> {
+    const response = await this.makeRequest<BackpackWithdrawal[]>({
+      method: 'GET',
+      path: '/wapi/v1/capital/withdrawals',
+      params,
+    });
+    return response;
+  }
+
+  async getAllWithdrawals(): Promise<BackpackWithdrawal[]> {
+    const allWithdrawals: BackpackWithdrawal[] = [];
+    let offset = 0;
+    const limit = 1000;
+
+    while (true) {
+      console.log(`Fetching withdrawals with offset ${offset}...`);
+      const withdrawals = await this.getWithdrawals({ limit, offset });
+      
+      if (withdrawals.length === 0) {
+        break;
+      }
+      
+      allWithdrawals.push(...withdrawals);
+      
+      if (withdrawals.length < limit) {
+        break;
+      }
+      
+      offset += limit;
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allWithdrawals;
   }
 }

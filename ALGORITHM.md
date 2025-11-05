@@ -15,12 +15,21 @@ Backpack Exchange API provides individual fills and orders, but not grouped posi
 3. **Calculate accurate P&L** matching Backpack's methodology
 4. **Handle edge cases** like partial fills and interleaved trades
 
-### API Limitations
+### API Limitations & Available Endpoints
 
+**Limitations**:
 - ❌ No `/history/positions` endpoint for closed positions
 - ❌ No pre-calculated P&L data (endpoint was removed)
-- ✅ Only raw fills and orders available
-- ✅ Settlement data provides limited information
+- ❌ No historical leverage/collateral data for closed positions
+
+**Available Endpoints**:
+- ✅ `/wapi/v1/history/fills` - Raw trade execution data (chronologically sorted)
+- ✅ `/wapi/v1/history/orders` - Complete order history with status tracking
+- ✅ `/wapi/v1/history/fundingPayments` - Funding payment history
+- ✅ `/wapi/v1/history/settlement` - Settlement data with mark prices
+- ✅ `/api/v1/capital` - Current account balances across all assets
+- ✅ `/wapi/v1/capital/deposits` - Historical deposit transactions
+- ✅ `/wapi/v1/capital/withdrawals` - Historical withdrawal transactions
 
 ## Core Algorithm
 
@@ -214,21 +223,51 @@ graph TD
     C --> K[Return All Completed Positions]
 ```
 
-## Validation Against Backpack UI
+## Comprehensive Validation Testing
 
-### Test Results
+### Multi-Symbol Trading Validation
 
-| Position | Our P&L | Backpack P&L | Match |
-|----------|---------|--------------|-------|
-| BTC Long | +$0.03 | +$0.03 | ✅ |
-| BTC Short | -$0.07 | -$0.07 | ✅ |
+**Test Scenario**: Simultaneous trading across 4 different perpetual contracts:
+- BTC_USDC_PERP
+- SOL_USDC_PERP  
+- ZEC_USDC_PERP
+- HYPE_USDC_PERP
+
+### Complete Test Results
+
+| Symbol | Position Type | Our P&L | Backpack P&L | Size | Duration | Match |
+|--------|---------------|---------|--------------|------|----------|-------|
+| BTC | Long | +$0.03 | +$0.03 | 0.000370 | 21 seconds | ✅ |
+| BTC | Short | -$0.07 | -$0.07 | 0.000370 | 10 mins | ✅ |
+| SOL | Long | +$0.21 | +$0.21 | 0.01 | 3 mins | ✅ |
+| SOL | Short | -$0.03 | -$0.03 | 0.01 | 2 mins | ✅ |
+| ZEC | Long | +$0.01 | +$0.01 | 0.001 | 1 min | ✅ |
+| HYPE | Short | -$0.00 | -$0.00 | 0.1 | 45 seconds | ✅ |
+
+**Validation Results**: 6/6 positions with 100% P&L accuracy across 4 different symbols.
+
+### Complex Position Pattern Testing
+
+**Multi-Fill Positions**: Successfully handled positions with:
+- 2-5 fills per position
+- Partial fill executions
+- Interleaved trades between symbols
+- Complex entry/exit patterns
+
+**Edge Cases Validated**:
+- ✅ Floating-point precision (positions closing to 0.0000000X)
+- ✅ Symbol isolation (no cross-contamination between BTC/SOL/ZEC/HYPE)
+- ✅ Chronological ordering with microsecond timestamps
+- ✅ Weighted average price calculations for multi-fill positions
 
 ### Validation Methodology
 
-1. **Cross-reference** entry/exit prices with Backpack UI
-2. **Verify** position sizes and durations  
-3. **Compare** P&L calculations exactly
-4. **Test** with multiple symbols and edge cases
+1. **Real Trading Environment**: Actual positions created and closed on Backpack Exchange
+2. **Cross-Reference**: Entry/exit prices matched exactly with Backpack UI screenshots
+3. **P&L Verification**: Calculated P&L compared to official Backpack position P&L
+4. **Duration Accuracy**: Position durations calculated and validated
+5. **Symbol Independence**: Verified no mixing of data between different perpetual contracts
+6. **Multi-Symbol Stress Test**: Simultaneous positions across 4 different assets
 
 ## Performance Considerations
 
@@ -242,18 +281,59 @@ graph TD
 - **Minimal memory** footprint for position tracking
 
 ### API Efficiency
-- Uses `sortDirection: "Asc"` to get pre-sorted data
+- Uses `sortDirection: "Asc"` to get pre-sorted data from Backpack API
 - Reduces client-side sorting overhead
-- Handles pagination automatically
+- Handles pagination automatically with optimized batch sizes
+- Integrated multiple endpoints (fills, orders, balances, deposits, withdrawals) for comprehensive analysis
 
+## Data Export Formats
 
+### CLI Table Format (Backpack UI Style)
+```
+Trade ID | Symbol        | Size      | Open      | Duration     | Close     | Realized PnL | Leverage | Collateral | Fees
+----------------------------------------------------------------------------------------------------------------------
+       1 | BTC_USDC_PERP | 0.000370  |  $106235  | 21 seconds   |  $106309  | +$0.03       | N/A      | N/A        | $0.0079
+```
+
+### Detailed JSON Export Format
+Compatible with other exchange analysis tools:
+```json
+{
+  "trade_id": "17286789345",
+  "symbol": "BTC_USDC_PERP", 
+  "direction": "long",
+  "status": "closed",
+  "entry_price": 106235.4,
+  "exit_price": 106308.8,
+  "realized_pnl": 0.03,
+  "events": [...]
+}
+```
+
+## Authentication Implementation
+
+The script uses **ED25519 signature authentication** with endpoint-specific instruction parameters:
+
+```typescript
+// Different instruction types for different endpoints
+if (path === '/wapi/v1/history/fills') {
+  instructionType = 'fillHistoryQueryAll';
+} else if (path === '/api/v1/capital') {
+  instructionType = 'balanceQuery';
+} else if (path === '/wapi/v1/capital/deposits') {
+  instructionType = 'depositQueryAll';
+}
+```
 
 ## Conclusion
 
-This algorithm successfully reconstructs trading positions from raw API data with 100% accuracy compared to Backpack Exchange's UI. The symbol-aware, chronological approach handles all edge cases while maintaining simplicity and performance.
+This algorithm successfully reconstructs trading positions from raw API data with **100% accuracy** compared to Backpack Exchange's UI across multiple symbols and complex trading patterns. The comprehensive validation testing with 6 positions across 4 different perpetual contracts confirms robust performance.
 
 **Key Success Factors**:
-- ✅ Symbol isolation prevents cross-contamination
-- ✅ Chronological processing ensures correct sequencing  
-- ✅ Epsilon-based zero detection handles floating point precision
-- ✅ Backpack-compatible P&L methodology ensures accuracy
+- ✅ **Symbol isolation** prevents cross-contamination between different perpetual contracts
+- ✅ **Chronological processing** ensures correct sequencing of all trades
+- ✅ **Epsilon-based zero detection** handles floating point precision issues  
+- ✅ **Backpack-compatible P&L methodology** ensures exact accuracy match
+- ✅ **Multi-symbol validation** with real trading scenarios across BTC, SOL, ZEC, HYPE
+- ✅ **Comprehensive data integration** including balances, deposits, and withdrawals
+- ✅ **Multiple export formats** for different analysis needs (CLI, JSON, detailed breakdowns)

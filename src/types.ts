@@ -49,6 +49,48 @@ export interface BackpackFundingPayment {
   timestamp: number;
 }
 
+export interface BackpackFundingHistory {
+  userId: number;
+  subaccountId: number;
+  symbol: string;
+  quantity: string;
+  intervalEndTimestamp: string;
+  fundingRate: string;
+}
+
+export interface BackpackBalance {
+  [symbol: string]: {
+    available: string;
+    locked: string;
+    staked: string;
+  };
+}
+
+export interface BackpackDeposit {
+  id?: string;
+  transactionId?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  status: string;
+  symbol: string;
+  quantity: string;
+  timestamp: number;
+  fiatValue?: string;
+  fiatCurrency?: string;
+}
+
+export interface BackpackWithdrawal {
+  id?: string;
+  blockchain: string;
+  quantity: string;
+  fee?: string;
+  status: string;
+  address: string;
+  transactionHash?: string;
+  timestamp: number;
+  symbol: string;
+}
+
 export interface BackpackSettlement {
   id: string;
   symbol: string;

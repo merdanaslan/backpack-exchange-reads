@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 import { BackpackAPI } from './api';
-import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement } from './types';
-import { PositionReconstructor, formatPositionForCLI } from './analysis';
+import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement, BackpackFundingHistory, BackpackBalance, BackpackDeposit, BackpackWithdrawal } from './types';
+import { PositionReconstructor, formatPositionForCLI, formatPositionsAsTable, formatPositionsAsDetailedJSON } from './analysis';
 
 dotenv.config();
 
@@ -10,6 +10,10 @@ interface TradingData {
   orders: BackpackOrder[];
   fundingPayments: BackpackFundingPayment[];
   settlements: BackpackSettlement[];
+  fundingHistory: BackpackFundingHistory[];
+  balances: BackpackBalance;
+  deposits: BackpackDeposit[];
+  withdrawals: BackpackWithdrawal[];
 }
 
 function validateEnvironment(): BackpackCredentials {
@@ -36,6 +40,10 @@ function filterPerpetualTrades(data: TradingData): TradingData {
     orders: data.orders.filter(order => isPerpSymbol(order.symbol)),
     fundingPayments: data.fundingPayments.filter(payment => isPerpSymbol(payment.symbol)),
     settlements: data.settlements.filter(settlement => isPerpSymbol(settlement.symbol)),
+    fundingHistory: data.fundingHistory.filter(funding => isPerpSymbol(funding.symbol)),
+    balances: data.balances, // Keep all balances (not symbol-specific)
+    deposits: data.deposits, // Keep all deposits (not symbol-specific)
+    withdrawals: data.withdrawals, // Keep all withdrawals (not symbol-specific)
   };
 }
 
@@ -92,6 +100,10 @@ async function main(): Promise<void> {
     let orders: BackpackOrder[] = [];
     let fundingPayments: BackpackFundingPayment[] = [];
     let settlements: BackpackSettlement[] = [];
+    let fundingHistory: BackpackFundingHistory[] = [];
+    let balances: BackpackBalance = {};
+    let deposits: BackpackDeposit[] = [];
+    let withdrawals: BackpackWithdrawal[] = [];
     
     try {
       orders = await api.getOrders({ limit: 10 });
@@ -113,6 +125,34 @@ async function main(): Promise<void> {
     } catch (error) {
       console.log('Settlements endpoint not available');
     }
+    
+    try {
+      fundingHistory = await api.getFundingHistory({ limit: 10 });
+      console.log('Funding history endpoint working');
+    } catch (error) {
+      console.log('Funding history endpoint not available');
+    }
+    
+    try {
+      balances = await api.getBalances();
+      console.log('Balances endpoint working');
+    } catch (error) {
+      console.log('Balances endpoint not available');
+    }
+    
+    try {
+      deposits = await api.getDeposits({ limit: 10 });
+      console.log('Deposits endpoint working');
+    } catch (error) {
+      console.log('Deposits endpoint not available');
+    }
+    
+    try {
+      withdrawals = await api.getWithdrawals({ limit: 10 });
+      console.log('Withdrawals endpoint working');
+    } catch (error) {
+      console.log('Withdrawals endpoint not available');
+    }
 
     console.log('\n✅ Data fetch completed!\n');
 
@@ -121,6 +161,10 @@ async function main(): Promise<void> {
       orders,
       fundingPayments,
       settlements,
+      fundingHistory,
+      balances,
+      deposits,
+      withdrawals,
     };
 
     console.log('🔍 Filtering for perpetual trades only...\n');
@@ -145,7 +189,22 @@ async function main(): Promise<void> {
     } else {
       console.log(`\n✅ Found ${positionAnalysis.completedPositions.length} completed position(s):\n`);
 
-      // Display each position
+      // Display table format (like Backpack UI)
+      console.log('📊 POSITIONS TABLE (Backpack UI Format)');
+      console.log('='.repeat(60));
+      console.log(formatPositionsAsTable(positionAnalysis.completedPositions));
+
+      // Display detailed JSON structure
+      console.log('\n' + '='.repeat(60));
+      console.log('📄 DETAILED JSON STRUCTURE');
+      console.log('='.repeat(60));
+      const detailedPositions = formatPositionsAsDetailedJSON(positionAnalysis.completedPositions, perpData.orders);
+      console.log(JSON.stringify(detailedPositions, null, 2));
+
+      // Display individual position details
+      console.log('\n' + '='.repeat(60));
+      console.log('📋 INDIVIDUAL POSITION DETAILS');
+      console.log('='.repeat(60));
       positionAnalysis.completedPositions.forEach(position => {
         console.log(formatPositionForCLI(position));
         console.log('\n' + '-'.repeat(50) + '\n');

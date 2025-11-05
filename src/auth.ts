@@ -49,6 +49,14 @@ export class BackpackAuth {
       instructionType = 'fundingPayments';
     } else if (path === '/wapi/v1/history/settlement') {
       instructionType = 'settlement';
+    } else if (path === '/wapi/v1/history/funding') {
+      instructionType = 'fundingHistoryQueryAll';
+    } else if (path === '/api/v1/capital') {
+      instructionType = 'balanceQuery';
+    } else if (path === '/wapi/v1/capital/deposits') {
+      instructionType = 'depositQueryAll';
+    } else if (path === '/wapi/v1/capital/withdrawals') {
+      instructionType = 'withdrawalQueryAll';
     } else {
       instructionType = `${method.toLowerCase()}${path.replace(/\//g, '')}`;
     }

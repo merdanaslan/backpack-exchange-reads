@@ -14,6 +14,8 @@ export interface CompletedPosition {
   realizedPnl: number;
   realizedPnlPercent: number;
   totalFees: number;
+  leverage: string; // "N/A" for historical positions
+  collateral: string; // "N/A" for historical positions
   fills: BackpackFill[];
 }
 
@@ -225,6 +227,8 @@ export class PositionReconstructor {
       realizedPnl,
       realizedPnlPercent,
       totalFees,
+      leverage: 'N/A', // No historical leverage data available from API
+      collateral: 'N/A', // No historical collateral data available from API
       fills
     };
   }
@@ -276,10 +280,154 @@ Position #${position.id} - ${position.symbol}
 ├─ Exit: $${position.exitPrice.toFixed(2)} (${position.exitTime.toLocaleString()})
 ├─ Duration: ${position.duration}
 ├─ Realized PnL: \x1b[${pnlColor}m${pnlSign}$${position.realizedPnl.toFixed(2)} (${pnlSign}${position.realizedPnlPercent.toFixed(2)}%)\x1b[0m
+├─ Leverage: ${position.leverage}
+├─ Collateral: ${position.collateral}
 └─ Total Fees: $${position.totalFees.toFixed(5)}
 
 Executions (${position.fills.length} fills):
 ${position.fills.map((fill, i) => 
   `  ${i + 1}. ${fill.side === 'Bid' ? 'Buy' : 'Sell'} ${fill.quantity} at $${fill.price} (fee: $${fill.fee})`
 ).join('\n')}`;
+}
+
+export function formatPositionsAsTable(positions: CompletedPosition[]): string {
+  if (positions.length === 0) return 'No positions to display.';
+  
+  const header = 'Trade ID | Symbol        | Size      | Open      | Duration     | Close     | Realized PnL | Leverage | Collateral | Fees';
+  const separator = '-'.repeat(header.length);
+  
+  const rows = positions.map(position => {
+    const pnlSign = position.realizedPnl >= 0 ? '+' : '';
+    const pnlColor = position.realizedPnl >= 0 ? '32' : '31';
+    const formattedPnl = `\x1b[${pnlColor}m${pnlSign}$${position.realizedPnl.toFixed(2)}\x1b[0m`;
+    
+    return [
+      position.id.toString().padStart(8),
+      position.symbol.padEnd(13),
+      position.size.toFixed(6).padStart(9),
+      `$${position.entryPrice.toFixed(2)}`.padStart(9),
+      position.duration.padEnd(12),
+      `$${position.exitPrice.toFixed(2)}`.padStart(9),
+      formattedPnl.padEnd(12),
+      position.leverage.padEnd(8),
+      position.collateral.padEnd(10),
+      `$${position.totalFees.toFixed(4)}`.padStart(8)
+    ].join(' | ');
+  });
+  
+  return [header, separator, ...rows].join('\n');
+}
+
+interface DetailedPositionEvent {
+  timestamp: string;
+  transaction_signature: string; // Using order_id as closest equivalent
+  event_name: string;
+  action: 'Buy' | 'Sell';
+  type: 'Market' | 'Limit';
+  size_usd: number;
+  price: number;
+  fee_usd: number;
+  position_fee_usd?: number;
+  funding_fee_usd?: number;
+  price_impact_fee_usd?: number;
+  trade_id?: string;
+  order_id?: string;
+}
+
+interface DetailedPosition {
+  trade_id: string;
+  position_key: string; // N/A for Backpack
+  symbol: string;
+  direction: 'long' | 'short';
+  status: 'closed' | 'active';
+  collateral_token: string;
+  size_usd: number;
+  notional_size: number;
+  collateral_usd: string; // N/A for historical positions
+  leverage: string; // N/A for historical positions
+  entry_price: number;
+  exit_price: number;
+  realized_pnl: number;
+  realized_pnl_percent: number;
+  total_fees: number;
+  has_profit: boolean;
+  entry_time: string;
+  exit_time: string;
+  events: DetailedPositionEvent[];
+}
+
+function extractCollateralToken(symbol: string): string {
+  // Extract base token from symbol like "BTC_USDC_PERP" -> "BTC"
+  return symbol.split('_')[0];
+}
+
+function getOrderType(fill: BackpackFill, orders: BackpackOrder[]): 'Market' | 'Limit' {
+  // Find the corresponding order to determine type
+  const order = orders?.find(o => o.id === fill.orderId);
+  return order?.orderType === 'Limit' ? 'Limit' : 'Market';
+}
+
+export function formatPositionsAsDetailedJSON(positions: CompletedPosition[], orders: BackpackOrder[] = []): DetailedPosition[] {
+  return positions.map(position => {
+    // Use first fill's tradeId as the trade_id
+    const firstFill = position.fills[0];
+    const trade_id = firstFill.tradeId.toString();
+    
+    // Extract collateral token
+    const collateral_token = extractCollateralToken(position.symbol);
+    
+    // Calculate size_usd and notional_size
+    const size_usd = position.notionalValue;
+    const notional_size = position.size;
+    
+    // Determine if position has profit
+    const has_profit = position.realizedPnl >= 0;
+    
+    // Map fills to events
+    const events: DetailedPositionEvent[] = position.fills.map((fill) => {
+      const fillPrice = parseFloat(fill.price);
+      const fillQuantity = parseFloat(fill.quantity);
+      const fillFee = parseFloat(fill.fee);
+      const action = fill.side === 'Bid' ? 'Buy' : 'Sell';
+      const orderType = getOrderType(fill, orders);
+      
+      return {
+        timestamp: new Date(fill.timestamp).toISOString(),
+        transaction_signature: fill.orderId, // Using order_id as closest equivalent to transaction signature
+        event_name: action === 'Buy' ? 'InstantIncreasePositionEvent' : 'InstantDecreasePositionEvent',
+        action,
+        type: orderType,
+        size_usd: fillPrice * fillQuantity,
+        price: fillPrice,
+        fee_usd: fillFee,
+        position_fee_usd: fillFee, // All fee considered as position fee for now
+        funding_fee_usd: 0, // TODO: Calculate from funding endpoint
+        price_impact_fee_usd: 0, // Not available in Backpack API
+        trade_id: fill.tradeId.toString(),
+        order_id: fill.orderId
+      };
+    });
+
+    return {
+      trade_id,
+      position_key: 'N/A', // Exchange-specific field
+      symbol: position.symbol,
+      direction: position.side.toLowerCase() as 'long' | 'short',
+      status: 'closed' as const,
+      collateral_token,
+      size_usd,
+      notional_size,
+      collateral_usd: 'N/A', // No historical collateral data available from API
+      leverage: 'N/A', // No historical leverage data available from API
+      entry_price: position.entryPrice,
+      exit_price: position.exitPrice,
+      realized_pnl: position.realizedPnl,
+      realized_pnl_percent: position.realizedPnlPercent,
+      total_fees: position.totalFees,
+      has_profit,
+      entry_time: position.entryTime.toISOString(),
+      exit_time: position.exitTime.toISOString(),
+      events
+    };
+  });
 }
