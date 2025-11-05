@@ -391,17 +391,28 @@ export function formatPositionsAsDetailedJSON(positions: CompletedPosition[], or
       const action = fill.side === 'Bid' ? 'Buy' : 'Sell';
       const orderType = getOrderType(fill, orders);
       
+      // Determine event name based on position opening/closing logic
+      let event_name: string;
+      const isLongPosition = position.side === 'Long';
+      const isOpeningAction = (isLongPosition && action === 'Buy') || (!isLongPosition && action === 'Sell');
+      
+      if (isOpeningAction) {
+        event_name = 'InstantIncreasePositionEvent'; // Opening position
+      } else {
+        event_name = 'InstantDecreasePositionEvent'; // Closing position  
+      }
+      
       return {
         timestamp: new Date(fill.timestamp).toISOString(),
         transaction_signature: fill.orderId, // Using order_id as closest equivalent to transaction signature
-        event_name: action === 'Buy' ? 'InstantIncreasePositionEvent' : 'InstantDecreasePositionEvent',
+        event_name,
         action,
         type: orderType,
         size_usd: fillPrice * fillQuantity,
         price: fillPrice,
         fee_usd: fillFee,
-        position_fee_usd: fillFee, // All fee considered as position fee for now
-        funding_fee_usd: 0, // TODO: Calculate from funding endpoint
+        position_fee_usd: 0, // Avoid duplication with fee_usd
+        funding_fee_usd: 0, // Not available for historical positions
         price_impact_fee_usd: 0, // Not available in Backpack API
         trade_id: fill.tradeId.toString(),
         order_id: fill.orderId

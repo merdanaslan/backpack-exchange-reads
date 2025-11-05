@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     console.log('Fetching fills data...');
     const fills = await api.getAllFills();
     
-    console.log('Testing other endpoints individually...');
+    console.log('Fetching orders data...');
     let orders: BackpackOrder[] = [];
     let fundingPayments: BackpackFundingPayment[] = [];
     let settlements: BackpackSettlement[] = [];
@@ -106,50 +106,50 @@ async function main(): Promise<void> {
     let withdrawals: BackpackWithdrawal[] = [];
     
     try {
-      orders = await api.getOrders({ limit: 10 });
-      console.log('Orders endpoint working');
+      orders = await api.getAllOrders();
+      console.log('Orders data fetched successfully');
     } catch (error) {
       console.log('Orders endpoint not available');
     }
     
     try {
-      fundingPayments = await api.getFundingPayments({ limit: 10 });
-      console.log('Funding payments endpoint working');
+      fundingPayments = await api.getAllFundingPayments();
+      console.log('Funding payments data fetched successfully');
     } catch (error) {
       console.log('Funding payments endpoint not available');
     }
     
     try {
-      settlements = await api.getSettlements({ limit: 10 });
-      console.log('Settlements endpoint working');
+      settlements = await api.getAllSettlements();
+      console.log('Settlements data fetched successfully');
     } catch (error) {
       console.log('Settlements endpoint not available');
     }
     
     try {
-      fundingHistory = await api.getFundingHistory({ limit: 10 });
-      console.log('Funding history endpoint working');
+      fundingHistory = await api.getAllFundingHistory();
+      console.log('Funding history data fetched successfully');
     } catch (error) {
       console.log('Funding history endpoint not available');
     }
     
     try {
       balances = await api.getBalances();
-      console.log('Balances endpoint working');
+      console.log('Balances data fetched successfully');
     } catch (error) {
       console.log('Balances endpoint not available');
     }
     
     try {
-      deposits = await api.getDeposits({ limit: 10 });
-      console.log('Deposits endpoint working');
+      deposits = await api.getAllDeposits();
+      console.log('Deposits data fetched successfully');
     } catch (error) {
       console.log('Deposits endpoint not available');
     }
     
     try {
-      withdrawals = await api.getWithdrawals({ limit: 10 });
-      console.log('Withdrawals endpoint working');
+      withdrawals = await api.getAllWithdrawals();
+      console.log('Withdrawals data fetched successfully');
     } catch (error) {
       console.log('Withdrawals endpoint not available');
     }
