@@ -57,6 +57,9 @@ export class BackpackAuth {
       instructionType = 'depositQueryAll';
     } else if (path === '/wapi/v1/capital/withdrawals') {
       instructionType = 'withdrawalQueryAll';
+    // Note: Position endpoints currently not accessible
+    // } else if (path === '/wapi/v1/history/position') {
+    //   instructionType = 'positionHistoryQuery';
     } else {
       instructionType = `${method.toLowerCase()}${path.replace(/\//g, '')}`;
     }

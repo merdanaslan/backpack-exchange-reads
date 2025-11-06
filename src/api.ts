@@ -11,6 +11,7 @@ import {
   BackpackBalance,
   BackpackDeposit,
   BackpackWithdrawal,
+  BackpackPosition,
   HistoryResponse,
   PaginationParams 
 } from './types';
@@ -44,6 +45,7 @@ export class BackpackAPI {
       });
       url += `?${params.toString()}`;
     }
+
 
     const response: AxiosResponse<T> = await this.client.request({
       method: config.method,
@@ -321,5 +323,53 @@ export class BackpackAPI {
     }
 
     return allWithdrawals;
+  }
+
+  async getPositions(params?: { subaccountId?: number; state?: string } & PaginationParams): Promise<BackpackPosition[]> {
+    const response = await this.makeRequest<BackpackPosition[]>({
+      method: 'GET',
+      path: '/wapi/v1/history/position',
+      params,
+    });
+    return response;
+  }
+
+
+  async getAllPositions(subaccountId: number = 0, state: string = 'Closed'): Promise<BackpackPosition[]> {
+    const allPositions: BackpackPosition[] = [];
+    let offset = 0;
+    const limit = 1000;
+
+    while (true) {
+      console.log(`Fetching positions with offset ${offset}...`);
+      const params: { subaccountId: number; limit: number; offset: number; state?: string } = {
+        subaccountId,
+        limit,
+        offset
+      };
+      
+      // Only include state if it's not empty
+      if (state && state.trim() !== '') {
+        params.state = state;
+      }
+      
+      const positions = await this.getPositions(params);
+      
+      if (positions.length === 0) {
+        break;
+      }
+      
+      allPositions.push(...positions);
+      
+      if (positions.length < limit) {
+        break;
+      }
+      
+      offset += limit;
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allPositions;
   }
 }

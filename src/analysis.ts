@@ -356,9 +356,9 @@ interface DetailedPosition {
   events: DetailedPositionEvent[];
 }
 
-function extractCollateralToken(symbol: string): string {
-  // Extract base token from symbol like "BTC_USDC_PERP" -> "BTC"
-  return symbol.split('_')[0];
+function extractCollateralToken(_symbol: string): string {
+  // Collateral information is not available from the API endpoints
+  return "N/A";
 }
 
 function getOrderType(fill: BackpackFill, orders: BackpackOrder[]): 'Market' | 'Limit' {

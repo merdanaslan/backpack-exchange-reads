@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import { BackpackAPI } from './api';
-import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement, BackpackFundingHistory, BackpackBalance, BackpackDeposit, BackpackWithdrawal } from './types';
+import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement, BackpackFundingHistory, BackpackBalance, BackpackDeposit, BackpackWithdrawal, BackpackPosition } from './types';
 import { PositionReconstructor, formatPositionForCLI, formatPositionsAsTable, formatPositionsAsDetailedJSON } from './analysis';
 
 dotenv.config();
@@ -14,6 +14,7 @@ interface TradingData {
   balances: BackpackBalance;
   deposits: BackpackDeposit[];
   withdrawals: BackpackWithdrawal[];
+  positions: BackpackPosition[];
 }
 
 function validateEnvironment(): BackpackCredentials {
@@ -44,38 +45,10 @@ function filterPerpetualTrades(data: TradingData): TradingData {
     balances: data.balances, // Keep all balances (not symbol-specific)
     deposits: data.deposits, // Keep all deposits (not symbol-specific)
     withdrawals: data.withdrawals, // Keep all withdrawals (not symbol-specific)
+    positions: data.positions, // Keep all positions (already filtered by state=Closed)
   };
 }
 
-function calculateSummary(data: TradingData): any {
-  const perpSymbols = new Set([
-    ...data.fills.map(f => f.symbol),
-    ...data.orders.map(o => o.symbol),
-    ...data.fundingPayments.map(p => p.symbol),
-    ...data.settlements.map(s => s.symbol),
-  ]);
-
-  const summary = {
-    totalSymbols: perpSymbols.size,
-    symbols: Array.from(perpSymbols).sort(),
-    totalFills: data.fills.length,
-    totalOrders: data.orders.length,
-    totalFundingPayments: data.fundingPayments.length,
-    totalSettlements: data.settlements.length,
-  };
-
-  if (data.fills.length > 0) {
-    const firstFill = data.fills.sort((a, b) => a.timestamp - b.timestamp)[0];
-    const lastFill = data.fills.sort((a, b) => b.timestamp - a.timestamp)[0];
-    
-    (summary as any).dateRange = {
-      firstTrade: new Date(firstFill.timestamp).toISOString(),
-      lastTrade: new Date(lastFill.timestamp).toISOString(),
-    };
-  }
-
-  return summary;
-}
 
 function displayRawDataAsJSON(data: TradingData): void {
   console.log('\n' + '='.repeat(60));
@@ -104,6 +77,7 @@ async function main(): Promise<void> {
     let balances: BackpackBalance = {};
     let deposits: BackpackDeposit[] = [];
     let withdrawals: BackpackWithdrawal[] = [];
+    let positions: BackpackPosition[] = [];
     
     try {
       orders = await api.getAllOrders();
@@ -153,6 +127,13 @@ async function main(): Promise<void> {
     } catch (error) {
       console.log('Withdrawals endpoint not available');
     }
+    
+    try {
+      positions = await api.getAllPositions(0, 'Closed');
+      console.log('Positions data fetched successfully');
+    } catch (error) {
+      console.log('Positions endpoint not available');
+    }
 
     console.log('\n✅ Data fetch completed!\n');
 
@@ -165,6 +146,7 @@ async function main(): Promise<void> {
       balances,
       deposits,
       withdrawals,
+      positions,
     };
 
     console.log('🔍 Filtering for perpetual trades only...\n');
@@ -172,6 +154,19 @@ async function main(): Promise<void> {
 
     // Display raw JSON data
     displayRawDataAsJSON(perpData);
+
+    // Display positions from new endpoint
+    if (perpData.positions && perpData.positions.length > 0) {
+      console.log('\n' + '='.repeat(60));
+      console.log('🆕 POSITIONS FROM NEW ENDPOINT');
+      console.log('='.repeat(60));
+      console.log(JSON.stringify(perpData.positions, null, 2));
+    } else {
+      console.log('\n' + '='.repeat(60));
+      console.log('🆕 POSITIONS FROM NEW ENDPOINT');
+      console.log('='.repeat(60));
+      console.log('No positions found or endpoint not available');
+    }
 
     // Perform position analysis
     console.log('\n' + '='.repeat(60));

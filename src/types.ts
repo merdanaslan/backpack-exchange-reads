@@ -111,3 +111,8 @@ export interface PaginationParams {
   from?: number;
   to?: number;
 }
+
+export interface BackpackPosition {
+  // Basic structure - will update based on actual response
+  [key: string]: any;
+}
