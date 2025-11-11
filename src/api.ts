@@ -12,6 +12,8 @@ import {
   BackpackDeposit,
   BackpackWithdrawal,
   BackpackPosition,
+  BackpackAccount,
+  BackpackInterestHistory,
   HistoryResponse,
   PaginationParams 
 } from './types';
@@ -371,5 +373,110 @@ export class BackpackAPI {
     }
 
     return allPositions;
+  }
+
+  async getAccount(): Promise<BackpackAccount> {
+    const response = await this.makeRequest<BackpackAccount>({
+      method: 'GET',
+      path: '/api/v1/account',
+    });
+    return response;
+  }
+
+  async getInterestHistory(params?: PaginationParams): Promise<BackpackInterestHistory[]> {
+    const response = await this.makeRequest<BackpackInterestHistory[]>({
+      method: 'GET',
+      path: '/wapi/v1/history/interest',
+      params,
+    });
+    return response;
+  }
+
+  async testInterestEndpoint(): Promise<void> {
+    console.log('🔍 Testing different interest endpoints...');
+    
+    const testCases = [
+      { path: '/api/v1/history/interest', instruction: 'interestHistoryQuery' },
+      { path: '/wapi/v1/history/interest', instruction: 'interestHistoryQueryAll' },
+      { path: '/wapi/v1/capital/interest', instruction: 'interestQueryAll' },
+      { path: '/api/v1/capital/interest', instruction: 'interestQuery' },
+      { path: '/api/v1/history/interest', instruction: 'interestHistoryQueryAll' }
+    ];
+
+    for (const testCase of testCases) {
+      try {
+        console.log(`Testing: ${testCase.path} with instruction: ${testCase.instruction}`);
+        const response = await this.makeRequest<any>({
+          method: 'GET',
+          path: testCase.path,
+        });
+        console.log(`✅ SUCCESS: ${testCase.path} returned:`, response?.slice?.(0, 2) || response);
+        break; // Stop at first success
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.log(`❌ Failed: ${testCase.path} - ${errorMsg}`);
+      }
+    }
+  }
+
+  async getAllInterestHistory(): Promise<BackpackInterestHistory[]> {
+    // Try different endpoint paths and see which one works
+    const possiblePaths = [
+      '/api/v1/history/interest',
+      '/wapi/v1/history/interest',
+      '/wapi/v1/capital/interest',
+      '/api/v1/capital/interest'
+    ];
+    
+    let lastError: any = null;
+    
+    for (const path of possiblePaths) {
+      try {
+        console.log(`Trying interest endpoint: ${path}`);
+        const response = await this.makeRequest<BackpackInterestHistory[]>({
+          method: 'GET',
+          path: path,
+          params: { limit: 1000, offset: 0 },
+        });
+        console.log(`Success! Found working endpoint: ${path}`);
+        
+        // If we found a working endpoint, proceed with full pagination
+        const allInterest: BackpackInterestHistory[] = [];
+        let offset = 0;
+        const limit = 1000;
+
+        while (true) {
+          console.log(`Fetching interest history with offset ${offset}...`);
+          const interest = await this.makeRequest<BackpackInterestHistory[]>({
+            method: 'GET',
+            path: path,
+            params: { limit, offset },
+          });
+          
+          if (interest.length === 0) {
+            break;
+          }
+          
+          allInterest.push(...interest);
+          
+          if (interest.length < limit) {
+            break;
+          }
+          
+          offset += limit;
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        return allInterest;
+      } catch (error) {
+        console.log(`Failed endpoint ${path}:`, error instanceof Error ? error.message : error);
+        lastError = error;
+        continue;
+      }
+    }
+    
+    // If we get here, none of the endpoints worked
+    throw lastError || new Error('All interest history endpoint attempts failed');
   }
 }

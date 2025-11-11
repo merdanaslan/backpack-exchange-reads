@@ -116,3 +116,26 @@ export interface BackpackPosition {
   // Basic structure - will update based on actual response
   [key: string]: any;
 }
+
+export interface BackpackAccount {
+  autoBorrowSettlements?: boolean;
+  autoLend?: boolean;
+  leverageLimit?: string;
+  limitOrders?: number;
+  liquidating?: boolean;
+  // Add other account fields as they're discovered from API
+  [key: string]: any;
+}
+
+export interface BackpackInterestHistory {
+  interestRate: string;
+  interval: number;
+  marketSymbol: string;
+  paymentType: 'Lend' | 'Borrow' | 'UnrealizedPnl' | string; // Actual payment types from API
+  positionId: string;
+  quantity: string; // This is the interest amount earned
+  symbol: string;
+  timestamp: string;
+  // Add other fields as discovered from API
+  [key: string]: any;
+}

@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import { BackpackAPI } from './api';
-import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement, BackpackFundingHistory, BackpackBalance, BackpackDeposit, BackpackWithdrawal, BackpackPosition } from './types';
+import { BackpackCredentials, BackpackFill, BackpackOrder, BackpackFundingPayment, BackpackSettlement, BackpackFundingHistory, BackpackBalance, BackpackDeposit, BackpackWithdrawal, BackpackPosition, BackpackAccount, BackpackInterestHistory } from './types';
 import { PositionReconstructor, formatPositionForCLI, formatPositionsAsTable, formatPositionsAsDetailedJSON } from './analysis';
 
 dotenv.config();
@@ -15,6 +15,8 @@ interface TradingData {
   deposits: BackpackDeposit[];
   withdrawals: BackpackWithdrawal[];
   positions: BackpackPosition[];
+  account: BackpackAccount;
+  interestHistory: BackpackInterestHistory[];
 }
 
 function validateEnvironment(): BackpackCredentials {
@@ -46,6 +48,8 @@ function filterPerpetualTrades(data: TradingData): TradingData {
     deposits: data.deposits, // Keep all deposits (not symbol-specific)
     withdrawals: data.withdrawals, // Keep all withdrawals (not symbol-specific)
     positions: data.positions, // Keep all positions (already filtered by state=Closed)
+    account: data.account, // Keep all account info (not symbol-specific)
+    interestHistory: data.interestHistory, // Keep all interest history (not symbol-specific)
   };
 }
 
@@ -55,6 +59,126 @@ function displayRawDataAsJSON(data: TradingData): void {
   console.log('📄 RAW TRADING DATA (JSON)');
   console.log('='.repeat(60));
   console.log(JSON.stringify(data, null, 2));
+}
+
+function displayAccountInfo(account: BackpackAccount): void {
+  console.log('\n' + '='.repeat(60));
+  console.log('👤 ACCOUNT INFORMATION');
+  console.log('='.repeat(60));
+  
+  if (!account || Object.keys(account).length === 0) {
+    console.log('No account information available');
+    return;
+  }
+
+  console.log('Account Settings:');
+  if (account.autoBorrowSettlements !== undefined) {
+    console.log(`├─ Auto Borrow Settlements: ${account.autoBorrowSettlements ? 'Enabled' : 'Disabled'}`);
+  }
+  if (account.autoLend !== undefined) {
+    console.log(`├─ Auto Lend: ${account.autoLend ? 'Enabled' : 'Disabled'}`);
+  }
+  if (account.leverageLimit !== undefined) {
+    console.log(`├─ Leverage Limit: ${account.leverageLimit}`);
+  }
+  if (account.limitOrders !== undefined) {
+    console.log(`├─ Limit Orders: ${account.limitOrders}`);
+  }
+  if (account.liquidating !== undefined) {
+    console.log(`└─ Liquidating: ${account.liquidating ? 'Yes' : 'No'}`);
+  }
+
+  // Display any additional fields
+  const knownFields = ['autoBorrowSettlements', 'autoLend', 'leverageLimit', 'limitOrders', 'liquidating'];
+  const additionalFields = Object.keys(account).filter(key => !knownFields.includes(key));
+  
+  if (additionalFields.length > 0) {
+    console.log('\nAdditional Account Data:');
+    additionalFields.forEach(field => {
+      console.log(`├─ ${field}: ${JSON.stringify(account[field])}`);
+    });
+  }
+}
+
+function displayInterestHistory(interestHistory: BackpackInterestHistory[]): void {
+  console.log('\n' + '='.repeat(60));
+  console.log('💰 INTEREST HISTORY');
+  console.log('='.repeat(60));
+  
+  if (interestHistory.length === 0) {
+    console.log('No interest history found');
+    return;
+  }
+
+  // Filter by payment types as available from API
+  const unrealizedPnlInterest = interestHistory.filter(interest => 
+    interest.paymentType === 'UnrealizedPnl'
+  );
+  const borrowLendInterest = interestHistory.filter(interest => 
+    interest.paymentType === 'Lend' || interest.paymentType === 'Borrow'
+  );
+
+  console.log(`Total Interest Records: ${interestHistory.length}\n`);
+
+  // Display UnrealizedPnl interest
+  if (unrealizedPnlInterest.length > 0) {
+    console.log('💹 UNREALIZED PNL INTEREST:');
+    console.log('-'.repeat(50));
+    unrealizedPnlInterest.forEach((interest, i) => {
+      const date = new Date(interest.timestamp).toLocaleString();
+      const amountColor = parseFloat(interest.quantity) >= 0 ? '32' : '31'; // Green for positive, red for negative
+      const amountSign = parseFloat(interest.quantity) >= 0 ? '+' : '';
+      
+      console.log(`${i + 1}. ${interest.symbol}`);
+      console.log(`   Amount: \x1b[${amountColor}m${amountSign}${interest.quantity}\x1b[0m`);
+      console.log(`   Interest Rate: ${interest.interestRate}`);
+      console.log(`   Date: ${date}`);
+      console.log(`   Payment Type: ${interest.paymentType}`);
+      console.log('');
+    });
+  }
+
+  // Display BorrowLend interest
+  if (borrowLendInterest.length > 0) {
+    console.log('🏦 BORROW/LEND INTEREST:');
+    console.log('-'.repeat(50));
+    borrowLendInterest.forEach((interest, i) => {
+      const date = new Date(interest.timestamp).toLocaleString();
+      const amountColor = parseFloat(interest.quantity) >= 0 ? '32' : '31'; // Green for positive, red for negative
+      const amountSign = parseFloat(interest.quantity) >= 0 ? '+' : '';
+      
+      console.log(`${i + 1}. ${interest.symbol}`);
+      console.log(`   Amount: \x1b[${amountColor}m${amountSign}${interest.quantity}\x1b[0m`);
+      console.log(`   Interest Rate: ${interest.interestRate}`);
+      console.log(`   Date: ${date}`);
+      console.log(`   Payment Type: ${interest.paymentType}`);
+      console.log('');
+    });
+  }
+
+  // Display summary
+  const totalUnrealizedAmount = unrealizedPnlInterest.reduce((sum, interest) => 
+    sum + parseFloat(interest.quantity), 0
+  );
+  const totalBorrowLendAmount = borrowLendInterest.reduce((sum, interest) => 
+    sum + parseFloat(interest.quantity), 0
+  );
+  const grandTotal = totalUnrealizedAmount + totalBorrowLendAmount;
+
+  console.log('📊 INTEREST SUMMARY:');
+  console.log('-'.repeat(30));
+  
+  const unrealizedColor = totalUnrealizedAmount >= 0 ? '32' : '31';
+  const unrealizedSign = totalUnrealizedAmount >= 0 ? '+' : '';
+  console.log(`UnrealizedPnl Total: \x1b[${unrealizedColor}m${unrealizedSign}${totalUnrealizedAmount.toFixed(8)}\x1b[0m`);
+  
+  const borrowLendColor = totalBorrowLendAmount >= 0 ? '32' : '31';
+  const borrowLendSign = totalBorrowLendAmount >= 0 ? '+' : '';
+  console.log(`BorrowLend Total: \x1b[${borrowLendColor}m${borrowLendSign}${totalBorrowLendAmount.toFixed(8)}\x1b[0m`);
+  
+  const grandTotalColor = grandTotal >= 0 ? '32' : '31';
+  const grandTotalSign = grandTotal >= 0 ? '+' : '';
+  console.log(`Grand Total: \x1b[${grandTotalColor}m${grandTotalSign}${grandTotal.toFixed(8)}\x1b[0m`);
 }
 
 async function main(): Promise<void> {
@@ -78,6 +202,8 @@ async function main(): Promise<void> {
     let deposits: BackpackDeposit[] = [];
     let withdrawals: BackpackWithdrawal[] = [];
     let positions: BackpackPosition[] = [];
+    let account: BackpackAccount = {};
+    let interestHistory: BackpackInterestHistory[] = [];
     
     try {
       orders = await api.getAllOrders();
@@ -134,6 +260,27 @@ async function main(): Promise<void> {
     } catch (error) {
       console.log('Positions endpoint not available');
     }
+    
+    try {
+      account = await api.getAccount();
+      console.log('Account data fetched successfully');
+    } catch (error) {
+      console.log('Account endpoint not available');
+    }
+    
+    try {
+      // First test if any interest endpoint works
+      await api.testInterestEndpoint();
+      
+      // If that doesn't throw, try the full fetch
+      interestHistory = await api.getAllInterestHistory();
+      console.log('Interest history data fetched successfully');
+    } catch (error) {
+      console.log('Interest history endpoint error:', error instanceof Error ? error.message : error);
+      if (error instanceof Error && error.message.includes('response')) {
+        console.log('This might indicate the endpoint path is incorrect or the instruction type is wrong');
+      }
+    }
 
     console.log('\n✅ Data fetch completed!\n');
 
@@ -147,6 +294,8 @@ async function main(): Promise<void> {
       deposits,
       withdrawals,
       positions,
+      account,
+      interestHistory,
     };
 
     console.log('🔍 Filtering for perpetual trades only...\n');
@@ -154,6 +303,12 @@ async function main(): Promise<void> {
 
     // Display raw JSON data
     displayRawDataAsJSON(perpData);
+
+    // Display account information
+    displayAccountInfo(perpData.account);
+
+    // Display interest history
+    displayInterestHistory(perpData.interestHistory);
 
     // Display positions from new endpoint
     if (perpData.positions && perpData.positions.length > 0) {

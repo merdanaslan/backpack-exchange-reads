@@ -4,7 +4,9 @@ A comprehensive TypeScript script to fetch, analyze, and display your historical
 
 ## Features
 
-- **Comprehensive Data Fetching**: Retrieves fills, orders, funding payments, settlements, balances, deposits, and withdrawals with automatic pagination
+- **Comprehensive Data Fetching**: Retrieves fills, orders, funding payments, settlements, balances, deposits, withdrawals with automatic pagination
+- **Account Analytics**: Complete account settings, configuration, and interest history analysis
+- **Interest Categorization**: Separates lending earnings from position-specific interest payments
 - **Intelligent Position Reconstruction**: Groups individual fills into logical trading positions using symbol-aware tracking
 - **Multi-Symbol Support**: Handles simultaneous trading across multiple perpetual contracts (BTC, ETH, SOL, etc.)
 - **Accurate P&L Calculations**: Matches Backpack Exchange UI exactly with proper weighted average pricing
@@ -53,9 +55,41 @@ npm start
 
 ## CLI Output Formats
 
-The script displays data directly in your terminal with three comprehensive views:
+The script displays data directly in your terminal with comprehensive views:
 
-### 1. Positions Table (Backpack UI Style)
+### 1. Account Information Display
+```
+👤 ACCOUNT INFORMATION
+============================================================
+Account Settings:
+├─ Auto Borrow Settlements: Enabled
+├─ Auto Lend: Enabled
+├─ Leverage Limit: 10
+├─ Limit Orders: 0
+└─ Liquidating: No
+```
+
+### 2. Interest History Analysis
+```
+💰 INTEREST HISTORY
+============================================================
+Total Interest Records: 15
+
+🏦 BORROW/LEND INTEREST:
+1. USDC
+   Amount: +0.0000888885
+   Interest Rate: 0.0194655
+   Date: 11/11/2025, 8:00:00 AM
+   Payment Type: Lend
+
+📊 INTEREST SUMMARY:
+------------------------------
+UnrealizedPnl Total: +0.00000000
+BorrowLend Total: +0.00135043
+Grand Total: +0.00135043
+```
+
+### 3. Positions Table (Backpack UI Style)
 ```
 Trade ID | Symbol        | Size      | Open      | Duration     | Close     | Realized PnL | Leverage | Collateral | Fees
 ----------------------------------------------------------------------------------------------------------------------
@@ -63,10 +97,10 @@ Trade ID | Symbol        | Size      | Open      | Duration     | Close     | Re
        2 | BTC_USDC_PERP | 0.000370  |  $103593  | 10 mins      |  $103777  | -$0.07       | N/A      | N/A        | $0.0077
 ```
 
-### 2. Detailed JSON Export
+### 4. Detailed JSON Export
 Compatible with other exchange formats, includes comprehensive event arrays and metadata for each position.
 
-### 3. Individual Position Analysis
+### 5. Individual Position Analysis
 Detailed breakdown of each position with:
 - Entry/exit prices and timestamps
 - Duration calculations
@@ -76,13 +110,23 @@ Detailed breakdown of each position with:
 
 ## Data Retrieved
 
+### **Trading Data**
 - **Fills**: Your actual trade executions (chronologically sorted)
 - **Orders**: Complete order history with status tracking
 - **Funding Payments**: Perpetual funding payments received/paid
 - **Settlements**: Position settlements and mark price data  
+
+### **Account & Capital Management**
+- **Account Settings**: Auto-lend, auto-borrow, leverage limits, liquidation status, fee tiers
 - **Balances**: Current account balances across all assets
 - **Deposits**: Historical deposit transactions
 - **Withdrawals**: Historical withdrawal transactions
+
+### **Interest & Lending Analytics**
+- **Borrow/Lend Interest**: USDC lending earnings and borrowing costs (account-level)
+- **UnrealizedPnl Interest**: Position-specific interest payments on unrealized P&L
+- **Interest Categorization**: Automatic separation of lending income vs trading costs
+- **Hourly Interest Tracking**: Comprehensive interest payment history with rates and amounts
 
 ## Position Analysis
 
@@ -100,13 +144,23 @@ The script includes built-in delays between API calls to respect rate limits.
 
 ## API Endpoints Used
 
+### **Trading Data Endpoints**
 - `/wapi/v1/history/fills` - Trade execution data (chronologically sorted)
 - `/wapi/v1/history/orders` - Order history
 - `/wapi/v1/history/fundingPayments` - Funding payment history
 - `/wapi/v1/history/settlement` - Settlement data
+- `/wapi/v1/history/funding` - Funding rate history
+
+### **Account & Capital Endpoints**
+- `/api/v1/account` - Account settings and configuration
 - `/api/v1/capital` - Current account balances
 - `/wapi/v1/capital/deposits` - Deposit transaction history
 - `/wapi/v1/capital/withdrawals` - Withdrawal transaction history
+
+### **Interest & Lending Endpoints**
+- `/wapi/v1/history/interest` - Interest payment history (Lend/Borrow/UnrealizedPnl)
+  - **Borrow/Lend**: Account-level lending earnings and borrowing costs
+  - **UnrealizedPnl**: Position-specific interest on unrealized P&L
 
 ## Validation & Accuracy
 

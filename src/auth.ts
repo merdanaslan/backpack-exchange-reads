@@ -57,6 +57,16 @@ export class BackpackAuth {
       instructionType = 'depositQueryAll';
     } else if (path === '/wapi/v1/capital/withdrawals') {
       instructionType = 'withdrawalQueryAll';
+    } else if (path === '/api/v1/account') {
+      instructionType = 'accountQuery';
+    } else if (path === '/api/v1/history/interest') {
+      instructionType = 'interestHistoryQuery';
+    } else if (path === '/wapi/v1/history/interest') {
+      instructionType = 'interestHistoryQueryAll';
+    } else if (path === '/wapi/v1/capital/interest') {
+      instructionType = 'interestQueryAll';
+    } else if (path === '/api/v1/capital/interest') {
+      instructionType = 'interestQuery';
     // Note: Position endpoints currently not accessible
     // } else if (path === '/wapi/v1/history/position') {
     //   instructionType = 'positionHistoryQuery';

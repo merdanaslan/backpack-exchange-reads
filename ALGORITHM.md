@@ -23,13 +23,25 @@ Backpack Exchange API provides individual fills and orders, but not grouped posi
 - ❌ No historical leverage/collateral data for closed positions
 
 **Available Endpoints**:
+
+**Trading Data**:
 - ✅ `/wapi/v1/history/fills` - Raw trade execution data (chronologically sorted)
 - ✅ `/wapi/v1/history/orders` - Complete order history with status tracking
 - ✅ `/wapi/v1/history/fundingPayments` - Funding payment history
 - ✅ `/wapi/v1/history/settlement` - Settlement data with mark prices
+- ✅ `/wapi/v1/history/funding` - Funding rate history
+
+**Account & Capital Management**:
+- ✅ `/api/v1/account` - Account settings (auto-lend, leverage limits, fee tiers)
 - ✅ `/api/v1/capital` - Current account balances across all assets
 - ✅ `/wapi/v1/capital/deposits` - Historical deposit transactions
 - ✅ `/wapi/v1/capital/withdrawals` - Historical withdrawal transactions
+
+**Interest & Lending Analytics**:
+- ✅ `/wapi/v1/history/interest` - Interest payment history with categorization:
+  - **Lend**: Earnings from USDC lending (account-level)
+  - **Borrow**: Costs from USDC borrowing (account-level)
+  - **UnrealizedPnl**: Position-specific interest on unrealized P&L
 
 ## Core Algorithm
 
@@ -284,7 +296,78 @@ graph TD
 - Uses `sortDirection: "Asc"` to get pre-sorted data from Backpack API
 - Reduces client-side sorting overhead
 - Handles pagination automatically with optimized batch sizes
-- Integrated multiple endpoints (fills, orders, balances, deposits, withdrawals) for comprehensive analysis
+- Integrated multiple endpoints (fills, orders, balances, deposits, withdrawals, account, interest) for comprehensive analysis
+
+## Capital Management Analysis
+
+### Interest Payment Categorization
+
+The script provides comprehensive analysis of interest payments, separating them into distinct categories for proper financial tracking:
+
+#### **1. Borrow/Lend Interest (Account-Level)**
+```typescript
+const borrowLendInterest = interestHistory.filter(interest => 
+  interest.paymentType === 'Lend' || interest.paymentType === 'Borrow'
+);
+```
+
+**Characteristics**:
+- **Source**: USDC lending/borrowing on deposited capital
+- **Frequency**: Hourly automated payments 
+- **Relationship**: Account-level capital efficiency (not trade-specific)
+- **Display**: Separate from trading fees for clean performance metrics
+
+**Example Output**:
+```
+🏦 BORROW/LEND INTEREST:
+1. USDC
+   Amount: +0.0000888885
+   Interest Rate: 0.0194655
+   Date: 11/11/2025, 8:00:00 AM
+   Payment Type: Lend
+```
+
+#### **2. UnrealizedPnl Interest (Position-Specific)**
+```typescript
+const unrealizedPnlInterest = interestHistory.filter(interest => 
+  interest.paymentType === 'UnrealizedPnl'
+);
+```
+
+**Characteristics**:
+- **Source**: Interest on unrealized P&L of open positions
+- **Frequency**: Position-dependent
+- **Relationship**: Direct trading cost (included in fee composition)
+- **Display**: Integrated with trading performance metrics
+
+#### **3. Interest Summary Calculations**
+```typescript
+const totalBorrowLendAmount = borrowLendInterest.reduce((sum, interest) => 
+  sum + parseFloat(interest.quantity), 0
+);
+const totalUnrealizedAmount = unrealizedPnlInterest.reduce((sum, interest) => 
+  sum + parseFloat(interest.quantity), 0
+);
+const grandTotal = totalUnrealizedAmount + totalBorrowLendAmount;
+```
+
+### Trading vs Capital Management Separation
+
+**Trading Fees** (Position-Related):
+- Maker/Taker execution fees
+- Funding payments
+- Liquidation fees  
+- **UnrealizedPnl interest** ← Position-specific
+
+**Capital Management** (Account-Level):
+- **Borrow/Lend interest** ← Account-level efficiency
+- Deposit/withdrawal tracking
+- Balance management
+
+This separation provides:
+- **Clean trading performance** metrics
+- **Separate capital efficiency** tracking
+- **No confusion** between trading skill and lending income
 
 ## Data Export Formats
 
@@ -318,10 +401,18 @@ The script uses **ED25519 signature authentication** with endpoint-specific inst
 // Different instruction types for different endpoints
 if (path === '/wapi/v1/history/fills') {
   instructionType = 'fillHistoryQueryAll';
+} else if (path === '/wapi/v1/history/orders') {
+  instructionType = 'orderHistoryQueryAll';
 } else if (path === '/api/v1/capital') {
   instructionType = 'balanceQuery';
+} else if (path === '/api/v1/account') {
+  instructionType = 'accountQuery';
+} else if (path === '/wapi/v1/history/interest') {
+  instructionType = 'interestHistoryQueryAll';
 } else if (path === '/wapi/v1/capital/deposits') {
   instructionType = 'depositQueryAll';
+} else if (path === '/wapi/v1/capital/withdrawals') {
+  instructionType = 'withdrawalQueryAll';
 }
 ```
 
@@ -335,5 +426,5 @@ This algorithm successfully reconstructs trading positions from raw API data wit
 - ✅ **Epsilon-based zero detection** handles floating point precision issues  
 - ✅ **Backpack-compatible P&L methodology** ensures exact accuracy match
 - ✅ **Multi-symbol validation** with real trading scenarios across BTC, SOL, ZEC, HYPE
-- ✅ **Comprehensive data integration** including balances, deposits, and withdrawals
+- ✅ **Comprehensive data integration** including balances, deposits, withdrawals, account settings, and interest analytics
 - ✅ **Multiple export formats** for different analysis needs (CLI, JSON, detailed breakdowns)
