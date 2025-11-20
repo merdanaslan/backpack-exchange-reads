@@ -325,6 +325,7 @@ interface DetailedPositionEvent {
   action: 'Buy' | 'Sell';
   type: 'Market' | 'Limit';
   size_usd: number;
+  notional_size: number;
   price: number;
   fee_usd: number;
   position_fee_usd?: number;
@@ -409,6 +410,7 @@ export function formatPositionsAsDetailedJSON(positions: CompletedPosition[], or
         action,
         type: orderType,
         size_usd: fillPrice * fillQuantity,
+        notional_size: fillQuantity,
         price: fillPrice,
         fee_usd: fillFee,
         position_fee_usd: 0, // Avoid duplication with fee_usd
